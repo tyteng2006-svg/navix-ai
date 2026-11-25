@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -9,29 +10,43 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#101820;color:white;font-family:Arial}
-header{padding:18px;background:#172633;display:flex;justify-content:space-between}
-.logo{font-size:24px;font-weight:bold;color:#42e8b4}
-#map{height:65vh;width:100%}
-.panel{padding:16px;background:#172633}
-button{width:100%;padding:15px;border:0;border-radius:12px;background:#20c997;font-size:16px;font-weight:bold}
-#info{margin-top:12px;font-size:13px;line-height:1.8;color:#c5d3dc}
-footer{text-align:center;padding:12px;color:#8295a3;font-size:12px}
+header{padding:17px;background:#172633;display:flex;justify-content:space-between}
+.logo{font-size:23px;font-weight:bold;color:#42e8b4}
+#map{height:55vh;width:100%}
+.panel{padding:15px;background:#172633}
+input{width:100%;padding:14px;border-radius:10px;border:1px solid #526575;background:#243746;color:white;font-size:15px}
+button{padding:13px;border:0;border-radius:10px;background:#20c997;color:#102027;font-weight:bold}
+.actions{display:flex;gap:8px;margin-top:10px}
+.actions button{flex:1}
+#info{font-size:13px;line-height:1.7;color:#c5d3dc;margin-top:12px}
+footer{text-align:center;padding:12px;font-size:11px;color:#8295a3}
 </style>
 </head>
 <body>
 <header>
 <div class="logo">NAVIX AI</div>
-<div>● ONLINE</div>
+<div id="status">● ONLINE</div>
 </header>
 
 <div id="map"></div>
 
 <div class="panel">
-<button onclick="locateMe()">📍 定位我的位置</button>
-<div id="info">欢迎使用 NAVIX AI<br>智能导航系统准备就绪</div>
+<input id="destination" placeholder="输入目的地，例如 Johor Bahru City Square">
+
+<div class="actions">
+<button onclick="searchPlace()">搜索地点</button>
+<button onclick="locateMe()">📍 我的定位</button>
 </div>
 
-<footer>NAVIX AI © 2026 | Malaysia Intelligent Navigation</footer>
+<div class="actions">
+<button onclick="buildRoute()">规划驾车路线</button>
+<button onclick="clearRoute()">清除路线</button>
+</div>
+
+<div id="info">NAVIX AI 0.2<br>等待输入目的地...</div>
+</div>
+
+<footer>© OpenStreetMap contributors | Routing by OSRM</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -39,42 +54,140 @@ const map=L.map('map').setView([1.4927,103.7414],12);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
 maxZoom:19,
-attribution:'© OpenStreetMap'
+attribution:'© OpenStreetMap contributors'
 }).addTo(map);
 
-let marker;
+let userMarker=null;
+let destinationMarker=null;
+let routeLayer=null;
+let userPosition=null;
+let destinationPosition=null;
 
-function locateMe(){
 const info=document.getElementById('info');
 
+function locateMe(){
 if(!navigator.geolocation){
-info.innerText='浏览器不支持定位';
+info.innerText='浏览器不支持 GPS';
+return;
+}
+info.innerText='正在获取 GPS...';
+
+navigator.geolocation.getCurrentPosition(p=>{
+userPosition=[p.coords.latitude,p.coords.longitude];
+map.setView(userPosition,16);
+
+if(userMarker)map.removeLayer(userMarker);
+
+userMarker=L.marker(userPosition).addTo(map)
+.bindPopup('NAVIX AI：当前位置');
+
+info.innerText='GPS 定位成功！现在可以搜索目的地。';
+
+},()=>{
+info.innerText='GPS 定位失败，请检查权限。';
+},{enableHighAccuracy:true,timeout:15000});
+}
+
+async function searchPlace(){
+const query=document.getElementById('destination').value.trim();
+if(!query){
+info.innerText='请先输入目的地';
 return;
 }
 
-info.innerText='正在获取 GPS 位置...';
+info.innerText='正在搜索地点...';
 
-navigator.geolocation.getCurrentPosition(
-p=>{
-const lat=p.coords.latitude;
-const lng=p.coords.longitude;
+try{
+const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=my&q='+encodeURIComponent(query);
 
-map.setView([lat,lng],17);
+const response=await fetch(url);
+if(!response.ok)throw new Error('搜索服务暂时不可用');
 
-if(marker)map.removeLayer(marker);
+const results=await response.json();
+if(!results.length){
+info.innerText='找不到地点，请尝试更完整的名称。';
+return;
+}
 
-marker=L.marker([lat,lng]).addTo(map)
-.bindPopup('NAVIX AI：当前位置').openPopup();
+destinationPosition=[
+Number(results[0].lat),
+Number(results[0].lon)
+];
 
-info.innerHTML='GPS 定位成功！<br>纬度：'+lat.toFixed(6)+
-'<br>经度：'+lng.toFixed(6)+
-'<br>精度：'+Math.round(p.coords.accuracy)+' 米';
-},
-e=>{
-info.innerText='定位失败，请检查手机 GPS 和网站定位权限。';
-},
-{enableHighAccuracy:true,timeout:15000}
-);
+if(destinationMarker)map.removeLayer(destinationMarker);
+
+destinationMarker=L.marker(destinationPosition).addTo(map)
+.bindPopup(results[0].display_name).openPopup();
+
+map.setView(destinationPosition,15);
+
+info.innerText='找到目的地：'+results[0].display_name+
+'\n如果要规划路线，请先获取 GPS 定位。';
+
+}catch(e){
+info.innerText='搜索失败：'+e.message;
+}
+}
+
+async function buildRoute(){
+if(!userPosition){
+info.innerText='请先点击「我的定位」';
+return;
+}
+if(!destinationPosition){
+info.innerText='请先搜索目的地';
+return;
+}
+
+info.innerText='正在计算驾车路线...';
+
+try{
+const a=userPosition;
+const b=destinationPosition;
+
+const url='https://router.project-osrm.org/route/v1/driving/'+
+a[1]+','+a[0]+';'+b[1]+','+b[0]+
+'?overview=full&geometries=geojson';
+
+const response=await fetch(url);
+if(!response.ok)throw new Error('路线服务暂时不可用');
+
+const data=await response.json();
+if(data.code!=='Ok'||!data.routes.length){
+info.innerText='暂时找不到可用驾车路线';
+return;
+}
+
+const route=data.routes[0];
+
+if(routeLayer)map.removeLayer(routeLayer);
+
+routeLayer=L.geoJSON(route.geometry,{
+style:{color:'#20c997',weight:6,opacity:0.9}
+}).addTo(map);
+
+map.fitBounds(routeLayer.getBounds(),{padding:[25,25]});
+
+const km=(route.distance/1000).toFixed(1);
+const minutes=Math.round(route.duration/60);
+
+info.innerText='路线规划成功！\n距离：'+km+
+' 公里\n预计时间：约 '+minutes+' 分钟\n（不含实时交通延误）';
+
+}catch(e){
+info.innerText='路线规划失败：'+e.message;
+}
+}
+
+function clearRoute(){
+if(routeLayer)map.removeLayer(routeLayer);
+if(destinationMarker)map.removeLayer(destinationMarker);
+
+routeLayer=null;
+destinationMarker=null;
+destinationPosition=null;
+
+info.innerText='路线已清除。';
 }
 </script>
 </body>
