@@ -1,194 +1,309 @@
 
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>NAVIX AI</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
+:root{--bg:#fff;--panel:#fff;--text:#18232b;--muted:#697780;--line:#e5ebef;--cyan:#00cfe8;--dark:#07131c}
+@media(prefers-color-scheme:dark){
+:root{--bg:#09141c;--panel:#12222d;--text:#effaff;--muted:#a5b8c2;--line:#29404d}
+}
 *{box-sizing:border-box}
-body{margin:0;background:#101820;color:white;font-family:Arial}
-header{padding:17px;background:#172633;display:flex;justify-content:space-between}
-.logo{font-size:23px;font-weight:bold;color:#42e8b4}
-#map{height:55vh;width:100%}
-.panel{padding:15px;background:#172633}
-input{width:100%;padding:14px;border-radius:10px;border:1px solid #526575;background:#243746;color:white;font-size:15px}
-button{padding:13px;border:0;border-radius:10px;background:#20c997;color:#102027;font-weight:bold}
-.actions{display:flex;gap:8px;margin-top:10px}
-.actions button{flex:1}
-#info{font-size:13px;line-height:1.7;color:#c5d3dc;margin-top:12px}
-footer{text-align:center;padding:12px;font-size:11px;color:#8295a3}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+header{height:55px;padding:0 15px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);border-bottom:1px solid var(--line)}
+.logo{font-size:20px;font-weight:900;letter-spacing:1px}
+.logo span{color:var(--cyan)}
+#status{font-size:11px;color:var(--muted)}
+#map{height:55vh;min-height:340px;width:100%;background:#dce4e8}
+.panel{padding:13px;background:var(--panel)}
+input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px}
+button{border:0;border-radius:10px;padding:12px 14px;background:var(--cyan);color:#00252d;font-weight:bold;font-size:14px}
+button.secondary{background:var(--line);color:var(--text)}
+.controls{display:flex;gap:8px;margin-top:9px}
+.controls button{flex:1}
+#results{max-height:130px;overflow:auto}
+.result{padding:11px;border-bottom:1px solid var(--line);font-size:14px}
+.routecard{padding:11px;margin-top:8px;border:1px solid var(--line);border-radius:10px}
+.routecard.selected{border:2px solid var(--cyan)}
+.routecard button{margin-top:7px}
+.small{font-size:12px;color:var(--muted)}
+#steps{max-height:220px;overflow:auto}
+.step{padding:10px 4px;border-bottom:1px solid var(--line);font-size:13px}
+.step b{color:var(--cyan)}
+#notice{font-size:12px;color:var(--muted);padding:9px 0}
+.leaflet-control-attribution{font-size:9px!important}
 </style>
 </head>
 <body>
 <header>
-<div class="logo">NAVIX AI</div>
-<div id="status">● ONLINE</div>
+ <div class="logo">NAVIX <span>AI</span></div>
+ <div id="status">准备就绪</div>
 </header>
 
 <div id="map"></div>
 
 <div class="panel">
-<input id="destination" placeholder="输入目的地，例如 Johor Bahru City Square">
-
-<div class="actions">
-<button onclick="searchPlace()">搜索地点</button>
-<button onclick="locateMe()">📍 我的定位</button>
+ <input id="destination" placeholder="输入目的地，例如 Mid Valley Southkey">
+ <div class="controls">
+  <button onclick="searchPlace()">搜索目的地</button>
+  <button class="secondary" onclick="locateMe()">我的位置</button>
+ </div>
+ <div id="results"></div>
+ <div class="controls">
+  <button onclick="planRoute()">规划路线</button>
+  <button class="secondary" onclick="speakNext()">语音提示</button>
+  <button class="secondary" onclick="clearRoute()">清除</button>
+ </div>
+ <div id="routes"></div>
+ <div id="notice">先定位，再搜索目的地。选择路线后查看转弯指引。</div>
+ <div id="steps"></div>
 </div>
-
-<div class="actions">
-<button onclick="buildRoute()">规划驾车路线</button>
-<button onclick="clearRoute()">清除路线</button>
-</div>
-
-<div id="info">NAVIX AI 0.2<br>等待输入目的地...</div>
-</div>
-
-<footer>© OpenStreetMap contributors | Routing by OSRM</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const map=L.map('map').setView([1.4927,103.7414],12);
+const map=L.map('map').setView([1.4927,103.7414],13);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-maxZoom:19,
-attribution:'© OpenStreetMap contributors'
-}).addTo(map);
+let dark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+let tile;
+function setTiles(){
+ if(tile)map.removeLayer(tile);
+ tile=L.tileLayer(
+ dark
+ ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+ :'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+ {maxZoom:19,attribution:'© OpenStreetMap © CARTO'}
+ ).addTo(map);
+}
+setTiles();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{
+ dark=e.matches;setTiles();
+});
 
-let userMarker=null;
-let destinationMarker=null;
-let routeLayer=null;
-let userPosition=null;
-let destinationPosition=null;
+let me=null,destination=null,marker=null;
+let gpsWatch=null,routes=[],routeLines=[],selected=0;
+let lastReroute=0;
 
-const info=document.getElementById('info');
+function status(s){document.getElementById('status').textContent=s}
+function notice(s){document.getElementById('notice').textContent=s}
+function esc(s){
+ return String(s||'').replace(/[&<>"']/g,c=>({
+ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+ }[c]));
+}
+function distance(m){
+ return m>=1000?(m/1000).toFixed(1)+' km':Math.round(m)+' m';
+}
+function duration(s){
+ let n=Math.round(s/60);
+ return n>=60?Math.floor(n/60)+'小时'+n%60+'分钟':n+'分钟';
+}
 
 function locateMe(){
-if(!navigator.geolocation){
-info.innerText='浏览器不支持 GPS';
-return;
-}
-info.innerText='正在获取 GPS...';
-
-navigator.geolocation.getCurrentPosition(p=>{
-userPosition=[p.coords.latitude,p.coords.longitude];
-map.setView(userPosition,16);
-
-if(userMarker)map.removeLayer(userMarker);
-
-userMarker=L.marker(userPosition).addTo(map)
-.bindPopup('NAVIX AI：当前位置');
-
-info.innerText='GPS 定位成功！现在可以搜索目的地。';
-
-},()=>{
-info.innerText='GPS 定位失败，请检查权限。';
-},{enableHighAccuracy:true,timeout:15000});
+ if(!navigator.geolocation){
+  notice('此浏览器不支持 GPS 定位');return;
+ }
+ status('正在定位...');
+ navigator.geolocation.getCurrentPosition(p=>{
+  me=[p.coords.longitude,p.coords.latitude];
+  if(marker)map.removeLayer(marker);
+  marker=L.circleMarker([me[1],me[0]],{
+   radius:9,color:'#fff',weight:3,fillColor:'#008cff',fillOpacity:1
+  }).addTo(map).bindPopup('你的位置');
+  map.setView([me[1],me[0]],16);
+  status('GPS 定位成功');
+  notice('已找到你的位置，可以搜索目的地了');
+ },e=>{
+  status('定位失败');
+  notice('请允许浏览器使用位置权限，并确认手机 GPS 已开启');
+ },{enableHighAccuracy:true,timeout:15000,maximumAge:5000});
 }
 
 async function searchPlace(){
-const query=document.getElementById('destination').value.trim();
-if(!query){
-info.innerText='请先输入目的地';
-return;
+ const q=document.getElementById('destination').value.trim();
+ if(!q){notice('请先输入目的地');return}
+ status('正在搜索...');
+ try{
+  const url='https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(q);
+  const r=await fetch(url);
+  const data=await r.json();
+  const box=document.getElementById('results');
+  box.innerHTML='';
+  if(!data.length){box.textContent='找不到地点，请换一个名称';status('搜索完成');return}
+  data.forEach(item=>{
+   const div=document.createElement('div');
+   div.className='result';
+   div.textContent=item.display_name;
+   div.onclick=()=>{
+    destination=[Number(item.lon),Number(item.lat)];
+    document.getElementById('destination').value=item.display_name;
+    box.innerHTML='';
+    map.setView([destination[1],destination[0]],15);
+    L.popup().setLatLng([destination[1],destination[0]])
+     .setContent(esc(item.display_name)).openOn(map);
+    notice('目的地已选择，点击规划路线');
+   };
+   box.appendChild(div);
+  });
+  status('搜索完成');
+ }catch(e){status('搜索失败');notice('网络连接失败，请稍后再试')}
 }
 
-info.innerText='正在搜索地点...';
+document.getElementById('destination').addEventListener('keydown',e=>{
+ if(e.key==='Enter')searchPlace();
+});
 
-try{
-const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=my&q='+encodeURIComponent(query);
-
-const response=await fetch(url);
-if(!response.ok)throw new Error('搜索服务暂时不可用');
-
-const results=await response.json();
-if(!results.length){
-info.innerText='找不到地点，请尝试更完整的名称。';
-return;
+async function planRoute(){
+ if(!me){notice('请先点击「我的位置」取得 GPS');return}
+ if(!destination){notice('请先搜索并选择目的地');return}
+ status('正在规划路线...');
+ try{
+  const url='https://router.project-osrm.org/route/v1/driving/'+
+   me[0]+','+me[1]+';'+destination[0]+','+destination[1]+
+   '?alternatives=2&steps=true&overview=full&geometries=geojson';
+  const res=await fetch(url);
+  const data=await res.json();
+  if(data.code!=='Ok'||!data.routes.length){
+   status('找不到路线');notice('暂时无法规划路线，请换个地点或稍后再试');return;
+  }
+  routes=data.routes;
+  selected=0;
+  drawRoutes();
+  showSteps();
+  status('路线规划完成');
+  notice('已找到 '+routes.length+' 条路线。青色为当前选择路线。');
+ }catch(e){
+  status('路线规划失败');
+  notice('网络或路线服务暂时不可用，请稍后再试');
+ }
 }
 
-destinationPosition=[
-Number(results[0].lat),
-Number(results[0].lon)
-];
-
-if(destinationMarker)map.removeLayer(destinationMarker);
-
-destinationMarker=L.marker(destinationPosition).addTo(map)
-.bindPopup(results[0].display_name).openPopup();
-
-map.setView(destinationPosition,15);
-
-info.innerText='找到目的地：'+results[0].display_name+
-'\n如果要规划路线，请先获取 GPS 定位。';
-
-}catch(e){
-info.innerText='搜索失败：'+e.message;
+function drawRoutes(){
+ routeLines.forEach(l=>map.removeLayer(l));
+ routeLines=[];
+ routes.forEach((r,i)=>{
+  const coords=r.geometry.coordinates.map(c=>[c[1],c[0]]);
+  const line=L.polyline(coords,{
+   color:i===selected?'#00dff5':'#8798a5',
+   weight:i===selected?9:5,
+   opacity:i===selected?1:.65,
+   lineCap:'round',
+   lineJoin:'round'
+  }).addTo(map);
+  routeLines.push(line);
+  line.on('click',()=>{selected=i;drawRoutes();showSteps()});
+ });
+ const all=routeLines[selected];
+ if(all)map.fitBounds(all.getBounds(),{padding:[35,35]});
+ const box=document.getElementById('routes');
+ box.innerHTML='';
+ routes.forEach((r,i)=>{
+  const div=document.createElement('div');
+  div.className='routecard '+(i===selected?'selected':'');
+  div.innerHTML='<b>'+(i===0?'推荐路线':'路线 '+(i+1))+'</b>'+
+   '<div>'+distance(r.distance)+' · '+duration(r.duration)+'</div>'+
+   '<button onclick="chooseRoute('+i+')">'+(i===selected?'当前路线':'选择这条路线')+'</button>';
+  box.appendChild(div);
+ });
 }
-}
-
-async function buildRoute(){
-if(!userPosition){
-info.innerText='请先点击「我的定位」';
-return;
-}
-if(!destinationPosition){
-info.innerText='请先搜索目的地';
-return;
-}
-
-info.innerText='正在计算驾车路线...';
-
-try{
-const a=userPosition;
-const b=destinationPosition;
-
-const url='https://router.project-osrm.org/route/v1/driving/'+
-a[1]+','+a[0]+';'+b[1]+','+b[0]+
-'?overview=full&geometries=geojson';
-
-const response=await fetch(url);
-if(!response.ok)throw new Error('路线服务暂时不可用');
-
-const data=await response.json();
-if(data.code!=='Ok'||!data.routes.length){
-info.innerText='暂时找不到可用驾车路线';
-return;
+function chooseRoute(i){
+ selected=i;drawRoutes();showSteps();
 }
 
-const route=data.routes[0];
-
-if(routeLayer)map.removeLayer(routeLayer);
-
-routeLayer=L.geoJSON(route.geometry,{
-style:{color:'#20c997',weight:6,opacity:0.9}
-}).addTo(map);
-
-map.fitBounds(routeLayer.getBounds(),{padding:[25,25]});
-
-const km=(route.distance/1000).toFixed(1);
-const minutes=Math.round(route.duration/60);
-
-info.innerText='路线规划成功！\n距离：'+km+
-' 公里\n预计时间：约 '+minutes+' 分钟\n（不含实时交通延误）';
-
-}catch(e){
-info.innerText='路线规划失败：'+e.message;
+function instruction(step){
+ const m=step.maneuver||{};
+ const mod=m.modifier||'';
+ const name=step.name||'当前道路';
+ let action='继续行驶';
+ if(m.type==='depart')action='开始行驶';
+ else if(m.type==='arrive')action='到达目的地';
+ else if(m.type==='roundabout'||m.type==='rotary')action='进入环岛';
+ else if(m.type==='merge')action='并入道路';
+ else if(m.type==='on ramp')action='驶入匝道';
+ else if(m.type==='off ramp')action='驶出匝道';
+ else if(m.type==='turn'||m.type==='end of road'||m.type==='fork'){
+  if(mod.includes('left'))action='向左转';
+  else if(mod.includes('right'))action='向右转';
+  else if(mod.includes('uturn'))action='掉头';
+  else action='继续直行';
+ }else if(m.type==='continue')action='继续直行';
+ return action+(name?'，进入 '+name:'');
 }
+
+function showSteps(){
+ const box=document.getElementById('steps');
+ box.innerHTML='';
+ const leg=routes[selected].legs[0];
+ const steps=leg.steps||[];
+ steps.forEach((s,i)=>{
+  const div=document.createElement('div');
+  div.className='step';
+  div.innerHTML='<b>'+(i+1)+'. '+esc(instruction(s))+'</b>'+
+   '<div class="small">'+distance(s.distance)+' · '+duration(s.duration)+'</div>';
+  box.appendChild(div);
+ });
+}
+
+function speakNext(){
+ if(!routes.length){notice('请先规划路线');return}
+ const steps=routes[selected].legs[0].steps||[];
+ const s=steps.find(x=>x.distance>0)||steps[0];
+ if(!s)return;
+ if(!('speechSynthesis' in window)){notice('此浏览器不支持语音');return}
+ speechSynthesis.cancel();
+ const msg=new SpeechSynthesisUtterance(instruction(s));
+ msg.lang='zh-CN';
+ msg.rate=1;
+ speechSynthesis.speak(msg);
 }
 
 function clearRoute(){
-if(routeLayer)map.removeLayer(routeLayer);
-if(destinationMarker)map.removeLayer(destinationMarker);
-
-routeLayer=null;
-destinationMarker=null;
-destinationPosition=null;
-
-info.innerText='路线已清除。';
+ routes=[];routeLines.forEach(l=>map.removeLayer(l));routeLines=[];
+ document.getElementById('routes').innerHTML='';
+ document.getElementById('steps').innerHTML='';
+ destination=null;
+ notice('路线已清除');
+ status('准备就绪');
 }
+
+function haversine(a,b){
+ const R=6371000;
+ const rad=x=>x*Math.PI/180;
+ const dLat=rad(b[1]-a[1]),dLon=rad(b[0]-a[0]);
+ const x=Math.sin(dLat/2)**2+
+  Math.cos(rad(a[1]))*Math.cos(rad(b[1]))*Math.sin(dLon/2)**2;
+ return 2*R*Math.asin(Math.sqrt(x));
+}
+
+function watchGPS(){
+ if(!navigator.geolocation||gpsWatch!==null)return;
+ gpsWatch=navigator.geolocation.watchPosition(p=>{
+  const now=[p.coords.longitude,p.coords.latitude];
+  me=now;
+  if(marker)marker.setLatLng([now[1],now[0]]);
+  if(!routes.length)return;
+  const coords=routes[selected].geometry.coordinates;
+  let nearest=Infinity;
+  for(const c of coords){
+   nearest=Math.min(nearest,haversine(now,c));
+  }
+  if(nearest>100&&Date.now()-lastReroute>60000){
+   lastReroute=Date.now();
+   notice('检测到你可能偏离路线，正在重新规划...');
+   planRoute();
+  }
+ },()=>{}, {enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+}
+
+function startTracking(){
+ locateMe();
+ watchGPS();
+}
+window.addEventListener('load',()=>{
+ status('NAVIX AI 已启动');
+});
 </script>
 </body>
 </html>
