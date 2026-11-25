@@ -3,307 +3,804 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#09141c">
 <title>NAVIX AI</title>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
 <style>
-:root{--bg:#fff;--panel:#fff;--text:#18232b;--muted:#697780;--line:#e5ebef;--cyan:#00cfe8;--dark:#07131c}
-@media(prefers-color-scheme:dark){
-:root{--bg:#09141c;--panel:#12222d;--text:#effaff;--muted:#a5b8c2;--line:#29404d}
+:root{
+ --bg:#ffffff;
+ --panel:#ffffff;
+ --text:#14232d;
+ --muted:#71808a;
+ --line:#e4eaee;
+ --cyan:#00d9f2;
+ --soft:#eefbfe;
 }
+
+@media(prefers-color-scheme:dark){
+ :root{
+  --bg:#09141c;
+  --panel:#12232e;
+  --text:#f2fbff;
+  --muted:#a8bac4;
+  --line:#2b414d;
+  --soft:#183642;
+ }
+}
+
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
-header{height:55px;padding:0 15px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);border-bottom:1px solid var(--line)}
-.logo{font-size:20px;font-weight:900;letter-spacing:1px}
+
+body{
+ margin:0;
+ background:var(--bg);
+ color:var(--text);
+ font-family:Arial,sans-serif;
+}
+
+header{
+ height:58px;
+ display:flex;
+ align-items:center;
+ justify-content:space-between;
+ padding:0 16px;
+ background:var(--panel);
+ border-bottom:1px solid var(--line);
+}
+
+.logo{
+ font-size:21px;
+ font-weight:900;
+ letter-spacing:1px;
+}
+
 .logo span{color:var(--cyan)}
-#status{font-size:11px;color:var(--muted)}
-#map{height:55vh;min-height:340px;width:100%;background:#dce4e8}
-.panel{padding:13px;background:var(--panel)}
-input{width:100%;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font-size:15px}
-button{border:0;border-radius:10px;padding:12px 14px;background:var(--cyan);color:#00252d;font-weight:bold;font-size:14px}
-button.secondary{background:var(--line);color:var(--text)}
-.controls{display:flex;gap:8px;margin-top:9px}
+
+#status{
+ font-size:12px;
+ color:var(--muted);
+}
+
+#map{
+ width:100%;
+ height:48vh;
+ min-height:300px;
+ background:#dce5e9;
+}
+
+/* 夜间地图：只变暗底图，不影响青色路线 */
+.dark-tiles{
+ filter:invert(100%) hue-rotate(180deg)
+ brightness(90%) contrast(90%);
+}
+
+.panel{
+ padding:13px;
+ background:var(--panel);
+}
+
+input{
+ width:100%;
+ padding:14px;
+ border:1px solid var(--line);
+ border-radius:12px;
+ background:var(--bg);
+ color:var(--text);
+ font-size:15px;
+ outline:none;
+}
+
+input:focus{border-color:var(--cyan)}
+
+button{
+ border:0;
+ border-radius:11px;
+ padding:13px 12px;
+ background:var(--cyan);
+ color:#00232b;
+ font-weight:bold;
+ font-size:14px;
+ cursor:pointer;
+}
+
+button.secondary{
+ background:var(--soft);
+ color:var(--text);
+}
+
+button:disabled{opacity:.5}
+
+.controls{
+ display:flex;
+ gap:8px;
+ margin-top:9px;
+}
+
 .controls button{flex:1}
-#results{max-height:130px;overflow:auto}
-.result{padding:11px;border-bottom:1px solid var(--line);font-size:14px}
-.routecard{padding:11px;margin-top:8px;border:1px solid var(--line);border-radius:10px}
-.routecard.selected{border:2px solid var(--cyan)}
-.routecard button{margin-top:7px}
-.small{font-size:12px;color:var(--muted)}
-#steps{max-height:220px;overflow:auto}
-.step{padding:10px 4px;border-bottom:1px solid var(--line);font-size:13px}
-.step b{color:var(--cyan)}
-#notice{font-size:12px;color:var(--muted);padding:9px 0}
-.leaflet-control-attribution{font-size:9px!important}
+
+#results{
+ max-height:150px;
+ overflow:auto;
+}
+
+.result{
+ padding:12px 5px;
+ border-bottom:1px solid var(--line);
+ font-size:13px;
+ cursor:pointer;
+}
+
+.section-title{
+ font-size:14px;
+ font-weight:bold;
+ margin-top:15px;
+ margin-bottom:8px;
+}
+
+.routecard{
+ padding:12px;
+ margin-top:8px;
+ border:1px solid var(--line);
+ border-radius:12px;
+}
+
+.routecard.selected{
+ border:2px solid var(--cyan);
+ background:var(--soft);
+}
+
+.routecard button{
+ margin-top:9px;
+ width:100%;
+}
+
+.route-info{
+ display:flex;
+ justify-content:space-between;
+ gap:8px;
+ margin-top:7px;
+ font-size:13px;
+}
+
+.small{
+ font-size:12px;
+ color:var(--muted);
+ margin-top:5px;
+}
+
+#steps{
+ max-height:240px;
+ overflow:auto;
+}
+
+.step{
+ display:flex;
+ gap:12px;
+ padding:12px 5px;
+ border-bottom:1px solid var(--line);
+ font-size:13px;
+}
+
+.step-number{
+ width:27px;
+ height:27px;
+ border-radius:50%;
+ background:var(--soft);
+ color:var(--cyan);
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ flex-shrink:0;
+ font-weight:bold;
+}
+
+.step b{color:var(--text)}
+
+#notice{
+ padding:10px;
+ background:var(--soft);
+ border-radius:10px;
+ margin-top:10px;
+ font-size:12px;
+ line-height:1.6;
+ color:var(--text);
+}
+
+#guide{
+ display:none;
+ padding:14px;
+ margin-top:10px;
+ background:#073b49;
+ color:white;
+ border-radius:13px;
+}
+
+#guide strong{
+ display:block;
+ font-size:19px;
+ margin:5px 0;
+}
+
+#guide small{color:#b8eaf0}
+
+footer{
+ padding:12px;
+ text-align:center;
+ font-size:10px;
+ color:var(--muted);
+}
+
+.leaflet-control-attribution{
+ font-size:9px!important;
+}
 </style>
 </head>
+
 <body>
+
 <header>
  <div class="logo">NAVIX <span>AI</span></div>
- <div id="status">准备就绪</div>
+ <div id="status">导航系统已启动</div>
 </header>
 
 <div id="map"></div>
 
 <div class="panel">
- <input id="destination" placeholder="输入目的地，例如 Mid Valley Southkey">
+
+ <input id="destination"
+ placeholder="输入目的地，例如 Mid Valley Southkey">
+
  <div class="controls">
   <button onclick="searchPlace()">搜索目的地</button>
   <button class="secondary" onclick="locateMe()">我的位置</button>
  </div>
+
  <div id="results"></div>
+
  <div class="controls">
   <button onclick="planRoute()">规划路线</button>
   <button class="secondary" onclick="speakNext()">语音提示</button>
-  <button class="secondary" onclick="clearRoute()">清除</button>
  </div>
+
+ <div id="guide">
+  <small>路线指引</small>
+  <strong id="guideText">等待路线</strong>
+  <small id="guideDistance"></small>
+ </div>
+
+ <div id="notice">
+  欢迎使用 NAVIX AI。先定位，再搜索目的地。
+ </div>
+
+ <div class="section-title">可选路线</div>
  <div id="routes"></div>
- <div id="notice">先定位，再搜索目的地。选择路线后查看转弯指引。</div>
+
+ <div class="section-title">道路及转弯指引</div>
  <div id="steps"></div>
+
+ <div class="controls">
+  <button class="secondary" onclick="clearRoute()">清除路线</button>
+  <button class="secondary" onclick="planRoute()">重新规划</button>
+ </div>
+
 </div>
 
+<footer>
+ NAVIX AI 0.3.1 · Map data © OpenStreetMap contributors
+</footer>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
 const map=L.map('map').setView([1.4927,103.7414],13);
 
 let dark=window.matchMedia('(prefers-color-scheme: dark)').matches;
-let tile;
+let tile=null;
+let me=null;
+let destination=null;
+let marker=null;
+let destinationMarker=null;
+let routes=[];
+let routeLayers=[];
+let selected=0;
+let gpsWatch=null;
+let lastSearch=0;
+let lastReroute=0;
+let offRouteCount=0;
+let stepIndex=0;
+
+function status(s){
+ document.getElementById('status').textContent=s;
+}
+
+function notice(s){
+ document.getElementById('notice').textContent=s;
+}
+
 function setTiles(){
  if(tile)map.removeLayer(tile);
+
  tile=L.tileLayer(
- dark
- ?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
- :'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
- {maxZoom:19,attribution:'© OpenStreetMap © CARTO'}
+  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {
+   maxZoom:19,
+   attribution:'© OpenStreetMap contributors',
+   className:dark?'dark-tiles':''
+  }
  ).addTo(map);
 }
+
 setTiles();
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{
- dark=e.matches;setTiles();
-});
 
-let me=null,destination=null,marker=null;
-let gpsWatch=null,routes=[],routeLines=[],selected=0;
-let lastReroute=0;
+window.matchMedia('(prefers-color-scheme: dark)')
+ .addEventListener('change',e=>{
+  dark=e.matches;
+  setTiles();
+ });
 
-function status(s){document.getElementById('status').textContent=s}
-function notice(s){document.getElementById('notice').textContent=s}
-function esc(s){
+function escapeHTML(s){
  return String(s||'').replace(/[&<>"']/g,c=>({
- '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  '&':'&amp;',
+  '<':'&lt;',
+  '>':'&gt;',
+  '"':'&quot;',
+  "'":'&#39;'
  }[c]));
 }
+
 function distance(m){
- return m>=1000?(m/1000).toFixed(1)+' km':Math.round(m)+' m';
+ return m>=1000
+  ?(m/1000).toFixed(1)+' 公里'
+  :Math.round(m)+' 米';
 }
+
 function duration(s){
- let n=Math.round(s/60);
- return n>=60?Math.floor(n/60)+'小时'+n%60+'分钟':n+'分钟';
+ const n=Math.round(s/60);
+ return n>=60
+  ?Math.floor(n/60)+' 小时 '+n%60+' 分钟'
+  :n+' 分钟';
 }
 
 function locateMe(){
  if(!navigator.geolocation){
-  notice('此浏览器不支持 GPS 定位');return;
+  notice('浏览器不支持 GPS 定位');
+  return;
  }
+
  status('正在定位...');
+
  navigator.geolocation.getCurrentPosition(p=>{
   me=[p.coords.longitude,p.coords.latitude];
+
   if(marker)map.removeLayer(marker);
+
   marker=L.circleMarker([me[1],me[0]],{
-   radius:9,color:'#fff',weight:3,fillColor:'#008cff',fillOpacity:1
+   radius:9,
+   color:'#ffffff',
+   weight:3,
+   fillColor:'#008cff',
+   fillOpacity:1
   }).addTo(map).bindPopup('你的位置');
+
   map.setView([me[1],me[0]],16);
+
   status('GPS 定位成功');
-  notice('已找到你的位置，可以搜索目的地了');
+  notice('已经找到你的位置，可以搜索目的地了');
+
+  startGPSWatch();
+
  },e=>{
   status('定位失败');
-  notice('请允许浏览器使用位置权限，并确认手机 GPS 已开启');
- },{enableHighAccuracy:true,timeout:15000,maximumAge:5000});
+  notice('请允许网站使用位置权限，并开启手机 GPS。');
+ },{
+  enableHighAccuracy:true,
+  timeout:20000,
+  maximumAge:5000
+ });
+}
+
+function startGPSWatch(){
+ if(gpsWatch!==null||!navigator.geolocation)return;
+
+ gpsWatch=navigator.geolocation.watchPosition(p=>{
+  const now=[p.coords.longitude,p.coords.latitude];
+  me=now;
+
+  if(marker)marker.setLatLng([now[1],now[0]]);
+
+  checkOffRoute(now);
+
+ },()=>{},{
+  enableHighAccuracy:true,
+  maximumAge:3000,
+  timeout:15000
+ });
 }
 
 async function searchPlace(){
  const q=document.getElementById('destination').value.trim();
- if(!q){notice('请先输入目的地');return}
- status('正在搜索...');
+
+ if(!q){
+  notice('请先输入目的地');
+  return;
+ }
+
+ if(Date.now()-lastSearch<1100){
+  notice('请稍等一下再搜索');
+  return;
+ }
+
+ lastSearch=Date.now();
+ status('正在搜索地点...');
+
  try{
-  const url='https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+encodeURIComponent(q);
-  const r=await fetch(url);
-  const data=await r.json();
+  const url='https://nominatim.openstreetmap.org/search?format=json&limit=5&q='+
+   encodeURIComponent(q);
+
+  const res=await fetch(url);
+  if(!res.ok)throw new Error('Search failed');
+
+  const data=await res.json();
   const box=document.getElementById('results');
   box.innerHTML='';
-  if(!data.length){box.textContent='找不到地点，请换一个名称';status('搜索完成');return}
+
+  if(!data.length){
+   status('没有找到地点');
+   notice('请尝试输入更完整的地点名称');
+   return;
+  }
+
   data.forEach(item=>{
    const div=document.createElement('div');
    div.className='result';
    div.textContent=item.display_name;
+
    div.onclick=()=>{
-    destination=[Number(item.lon),Number(item.lat)];
+    destination=[
+     Number(item.lon),
+     Number(item.lat)
+    ];
+
     document.getElementById('destination').value=item.display_name;
     box.innerHTML='';
+
+    if(destinationMarker)map.removeLayer(destinationMarker);
+
+    destinationMarker=L.marker([
+     destination[1],destination[0]
+    ]).addTo(map).bindPopup('目的地');
+
     map.setView([destination[1],destination[0]],15);
-    L.popup().setLatLng([destination[1],destination[0]])
-     .setContent(esc(item.display_name)).openOn(map);
-    notice('目的地已选择，点击规划路线');
+
+    notice('目的地已选择，请点击规划路线');
    };
+
    box.appendChild(div);
   });
+
   status('搜索完成');
- }catch(e){status('搜索失败');notice('网络连接失败，请稍后再试')}
+
+ }catch(e){
+  status('搜索失败');
+  notice('地点搜索暂时不可用，请检查网络后再试');
+ }
 }
 
-document.getElementById('destination').addEventListener('keydown',e=>{
- if(e.key==='Enter')searchPlace();
-});
+document.getElementById('destination')
+ .addEventListener('keydown',e=>{
+  if(e.key==='Enter')searchPlace();
+ });
 
 async function planRoute(){
- if(!me){notice('请先点击「我的位置」取得 GPS');return}
- if(!destination){notice('请先搜索并选择目的地');return}
- status('正在规划路线...');
+ if(!me){
+  notice('请先点击我的位置，取得 GPS 定位');
+  return;
+ }
+
+ if(!destination){
+  notice('请先搜索并选择目的地');
+  return;
+ }
+
+ status('正在计算路线...');
+
  try{
   const url='https://router.project-osrm.org/route/v1/driving/'+
-   me[0]+','+me[1]+';'+destination[0]+','+destination[1]+
+   me[0]+','+me[1]+';'+
+   destination[0]+','+destination[1]+
    '?alternatives=2&steps=true&overview=full&geometries=geojson';
+
   const res=await fetch(url);
+  if(!res.ok)throw new Error('Route failed');
+
   const data=await res.json();
+
   if(data.code!=='Ok'||!data.routes.length){
-   status('找不到路线');notice('暂时无法规划路线，请换个地点或稍后再试');return;
+   status('没有找到路线');
+   notice('无法找到驾车路线，请尝试其他目的地');
+   return;
   }
+
   routes=data.routes;
   selected=0;
+  stepIndex=0;
+  offRouteCount=0;
+
   drawRoutes();
   showSteps();
+
   status('路线规划完成');
-  notice('已找到 '+routes.length+' 条路线。青色为当前选择路线。');
+
+  notice('找到 '+routes.length+
+   ' 条路线。青色路线是当前选择的路线。');
+
  }catch(e){
-  status('路线规划失败');
-  notice('网络或路线服务暂时不可用，请稍后再试');
+  status('规划失败');
+  notice('路线服务暂时不可用，请检查网络或稍后重试');
  }
 }
 
 function drawRoutes(){
- routeLines.forEach(l=>map.removeLayer(l));
- routeLines=[];
+ routeLayers.forEach(group=>{
+  group.forEach(layer=>map.removeLayer(layer));
+ });
+
+ routeLayers=[];
+
  routes.forEach((r,i)=>{
   const coords=r.geometry.coordinates.map(c=>[c[1],c[0]]);
-  const line=L.polyline(coords,{
-   color:i===selected?'#00dff5':'#8798a5',
-   weight:i===selected?9:5,
-   opacity:i===selected?1:.65,
+  const isSelected=i===selected;
+
+  const outer=L.polyline(coords,{
+   color:isSelected?'#003d4b':'#647783',
+   weight:isSelected?13:7,
+   opacity:isSelected?1:.65,
    lineCap:'round',
    lineJoin:'round'
   }).addTo(map);
-  routeLines.push(line);
-  line.on('click',()=>{selected=i;drawRoutes();showSteps()});
+
+  const inner=L.polyline(coords,{
+   color:isSelected?'#00e4ff':'#a8b9c3',
+   weight:isSelected?7:3,
+   opacity:isSelected?1:.7,
+   lineCap:'round',
+   lineJoin:'round'
+  }).addTo(map);
+
+  outer.on('click',()=>chooseRoute(i));
+  inner.on('click',()=>chooseRoute(i));
+
+  routeLayers.push([outer,inner]);
  });
- const all=routeLines[selected];
- if(all)map.fitBounds(all.getBounds(),{padding:[35,35]});
+
+ if(routeLayers[selected]){
+  map.fitBounds(routeLayers[selected][0].getBounds(),{
+   padding:[35,35]
+  });
+ }
+
  const box=document.getElementById('routes');
  box.innerHTML='';
+
  routes.forEach((r,i)=>{
   const div=document.createElement('div');
   div.className='routecard '+(i===selected?'selected':'');
-  div.innerHTML='<b>'+(i===0?'推荐路线':'路线 '+(i+1))+'</b>'+
-   '<div>'+distance(r.distance)+' · '+duration(r.duration)+'</div>'+
-   '<button onclick="chooseRoute('+i+')">'+(i===selected?'当前路线':'选择这条路线')+'</button>';
+
+  div.innerHTML=
+   '<b>'+(i===0?'推荐路线':'路线 '+(i+1))+'</b>'+
+   '<div class="route-info">'+
+   '<span>'+distance(r.distance)+'</span>'+
+   '<span>'+duration(r.duration)+'</span>'+
+   '</div>'+
+   '<div class="small">'+
+   (i===selected?'当前使用的路线':'点击选择这条路线')+
+   '</div>'+
+   '<button onclick="chooseRoute('+i+')">'+
+   (i===selected?'已选择':'选择这条路线')+
+   '</button>';
+
   box.appendChild(div);
  });
 }
+
 function chooseRoute(i){
- selected=i;drawRoutes();showSteps();
+ selected=i;
+ stepIndex=0;
+ drawRoutes();
+ showSteps();
 }
 
 function instruction(step){
  const m=step.maneuver||{};
  const mod=m.modifier||'';
- const name=step.name||'当前道路';
- let action='继续行驶';
+ const name=step.name||'';
+
+ let action='继续直行';
+
  if(m.type==='depart')action='开始行驶';
  else if(m.type==='arrive')action='到达目的地';
- else if(m.type==='roundabout'||m.type==='rotary')action='进入环岛';
+ else if(m.type==='roundabout'||m.type==='rotary'){
+  action='进入环岛'+(m.exit?'，从第 '+m.exit+' 个出口驶出':'');
+ }
  else if(m.type==='merge')action='并入道路';
  else if(m.type==='on ramp')action='驶入匝道';
  else if(m.type==='off ramp')action='驶出匝道';
- else if(m.type==='turn'||m.type==='end of road'||m.type==='fork'){
+ else if(m.type==='fork'){
+  action=mod.includes('left')?'在岔路选择左边':
+   mod.includes('right')?'在岔路选择右边':'在岔路继续直行';
+ }
+ else if(m.type==='turn'||m.type==='end of road'){
   if(mod.includes('left'))action='向左转';
   else if(mod.includes('right'))action='向右转';
   else if(mod.includes('uturn'))action='掉头';
   else action='继续直行';
- }else if(m.type==='continue')action='继续直行';
+ }
+ else if(m.type==='continue')action='继续直行';
+
  return action+(name?'，进入 '+name:'');
 }
 
 function showSteps(){
  const box=document.getElementById('steps');
  box.innerHTML='';
+
+ if(!routes.length)return;
+
  const leg=routes[selected].legs[0];
  const steps=leg.steps||[];
+
  steps.forEach((s,i)=>{
   const div=document.createElement('div');
   div.className='step';
-  div.innerHTML='<b>'+(i+1)+'. '+esc(instruction(s))+'</b>'+
-   '<div class="small">'+distance(s.distance)+' · '+duration(s.duration)+'</div>';
+
+  div.innerHTML=
+   '<div class="step-number">'+(i+1)+'</div>'+
+   '<div><b>'+escapeHTML(instruction(s))+'</b>'+
+   '<div class="small">'+distance(s.distance)+
+   ' · '+duration(s.duration)+'</div></div>';
+
   box.appendChild(div);
  });
+
+ updateGuide();
+}
+
+function updateGuide(){
+ if(!routes.length)return;
+
+ const steps=routes[selected].legs[0].steps||[];
+ const step=steps[Math.min(stepIndex,steps.length-1)];
+
+ if(!step)return;
+
+ document.getElementById('guide').style.display='block';
+ document.getElementById('guideText').textContent=instruction(step);
+ document.getElementById('guideDistance').textContent=
+  '该路段约 '+distance(step.distance);
 }
 
 function speakNext(){
- if(!routes.length){notice('请先规划路线');return}
+ if(!routes.length){
+  notice('请先规划路线');
+  return;
+ }
+
  const steps=routes[selected].legs[0].steps||[];
- const s=steps.find(x=>x.distance>0)||steps[0];
- if(!s)return;
- if(!('speechSynthesis' in window)){notice('此浏览器不支持语音');return}
+
+ if(!steps.length)return;
+
+ const step=steps[Math.min(stepIndex,steps.length-1)];
+
+ if(!('speechSynthesis' in window)){
+  notice('当前浏览器不支持语音播报');
+  return;
+ }
+
  speechSynthesis.cancel();
- const msg=new SpeechSynthesisUtterance(instruction(s));
+
+ const msg=new SpeechSynthesisUtterance(instruction(step));
  msg.lang='zh-CN';
  msg.rate=1;
- speechSynthesis.speak(msg);
-}
 
-function clearRoute(){
- routes=[];routeLines.forEach(l=>map.removeLayer(l));routeLines=[];
- document.getElementById('routes').innerHTML='';
- document.getElementById('steps').innerHTML='';
- destination=null;
- notice('路线已清除');
- status('准备就绪');
+ speechSynthesis.speak(msg);
+
+ if(stepIndex<steps.length-1)stepIndex++;
+ updateGuide();
 }
 
 function haversine(a,b){
  const R=6371000;
  const rad=x=>x*Math.PI/180;
- const dLat=rad(b[1]-a[1]),dLon=rad(b[0]-a[0]);
+
+ const dLat=rad(b[1]-a[1]);
+ const dLon=rad(b[0]-a[0]);
+
  const x=Math.sin(dLat/2)**2+
-  Math.cos(rad(a[1]))*Math.cos(rad(b[1]))*Math.sin(dLon/2)**2;
+  Math.cos(rad(a[1]))*Math.cos(rad(b[1]))*
+  Math.sin(dLon/2)**2;
+
  return 2*R*Math.asin(Math.sqrt(x));
 }
 
-function watchGPS(){
- if(!navigator.geolocation||gpsWatch!==null)return;
- gpsWatch=navigator.geolocation.watchPosition(p=>{
-  const now=[p.coords.longitude,p.coords.latitude];
-  me=now;
-  if(marker)marker.setLatLng([now[1],now[0]]);
-  if(!routes.length)return;
-  const coords=routes[selected].geometry.coordinates;
-  let nearest=Infinity;
-  for(const c of coords){
-   nearest=Math.min(nearest,haversine(now,c));
-  }
-  if(nearest>100&&Date.now()-lastReroute>60000){
-   lastReroute=Date.now();
-   notice('检测到你可能偏离路线，正在重新规划...');
-   planRoute();
-  }
- },()=>{}, {enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+function pointToSegment(p,a,b){
+ const lat=(p[1]+a[1]+b[1])/3*Math.PI/180;
+ const k=Math.cos(lat);
+
+ const x=p[0]*k,y=p[1];
+ const ax=a[0]*k,ay=a[1];
+ const bx=b[0]*k,by=b[1];
+
+ const dx=bx-ax,dy=by-ay;
+ const t=Math.max(0,Math.min(1,
+  ((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy||1)
+ ));
+
+ return haversine(
+  p,
+  [((ax+t*dx)/k),ay+t*dy]
+ );
 }
 
-function startTracking(){
- locateMe();
- watchGPS();
+function distanceToRoute(p,coords){
+ let best=Infinity;
+
+ for(let i=0;i<coords.length-1;i++){
+  best=Math.min(best,pointToSegment(p,coords[i],coords[i+1]));
+ }
+
+ return best;
 }
+
+function checkOffRoute(now){
+ if(!routes.length)return;
+
+ const coords=routes[selected].geometry.coordinates;
+ const gap=distanceToRoute(now,coords);
+
+ if(gap>100){
+  offRouteCount++;
+ }else{
+  offRouteCount=0;
+ }
+
+ if(offRouteCount>=3&&Date.now()-lastReroute>90000){
+  offRouteCount=0;
+  lastReroute=Date.now();
+
+  notice('你可能已经偏离路线，正在尝试重新规划...');
+  planRoute();
+ }
+}
+
+function clearRoute(){
+ routes=[];
+ routeLayers.forEach(group=>{
+  group.forEach(layer=>map.removeLayer(layer));
+ });
+ routeLayers=[];
+
+ document.getElementById('routes').innerHTML='';
+ document.getElementById('steps').innerHTML='';
+ document.getElementById('guide').style.display='none';
+
+ if(destinationMarker){
+  map.removeLayer(destinationMarker);
+  destinationMarker=null;
+ }
+
+ destination=null;
+ stepIndex=0;
+
+ notice('路线已清除');
+ status('准备就绪');
+}
+
 window.addEventListener('load',()=>{
- status('NAVIX AI 已启动');
+ status('NAVIX AI 已准备就绪');
 });
 </script>
+
 </body>
 </html>
